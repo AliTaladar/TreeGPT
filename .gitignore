@@ -1,0 +1,44 @@
+# Node.js
+node_modules/
+.env
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js
+.next/
+out/
+dist/
+build/
+
+# Environment files
+.env.local
+.env.development
+.env.test
+.env.production
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# IDEs and editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+
+# Coverage reports
+coverage/
