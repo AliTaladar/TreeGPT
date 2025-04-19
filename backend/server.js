@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const User = require('./models/User');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const cors = require('cors');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -13,6 +14,13 @@ const port = 5000;
 
 // Middleware to parse JSON request bodies
 app.use(express.json());
+
+// Enable CORS for requests from http://localhost:3000
+app.use(cors({
+  origin: 'http://localhost:3000',
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type'],
+}));
 
 // MongoDB connection
 const connectDB = async () => {
