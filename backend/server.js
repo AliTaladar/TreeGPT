@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const User = require('./models/User');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -55,6 +56,33 @@ app.post('/register', async (req, res) => {
     await newUser.save();
 
     res.status(201).json({ message: 'User registered successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error });
+  }
+});
+
+// User login endpoint
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required' });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: 'Email does not exist' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'That is not the correct password, try again.' });
+    }
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+
+    res.status(200).json({ token });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error });
   }
