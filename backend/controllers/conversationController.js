@@ -16,8 +16,18 @@ const createConversation = async (req, res) => {
     await newConversation.save();
     res.status(201).json(newConversation);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
-module.exports = { createConversation };
+const getConversations = async (req, res) => {
+  try {
+    const conversations = await Conversation.find({ userId: req.user.id });
+    res.status(200).json(conversations);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = { createConversation, getConversations };
