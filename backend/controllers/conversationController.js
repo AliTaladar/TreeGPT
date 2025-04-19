@@ -63,5 +63,21 @@ const createMessage = async (req, res) => {
   }
 };
 
-module.exports = { createConversation, getConversations, createMessage };
+const getMessages = async (req, res) => {
+  const conversationId = req.params.id;
+  const userId = req.user.id;
 
+  try {
+    const conversation = await Conversation.findOne({ _id: conversationId, userId });
+    if (!conversation) {
+      return res.status(404).json({ message: 'Conversation not found' });
+    }
+
+    const messages = await Message.find({ conversationId }).sort({ timestamp: 1 });
+    res.status(200).json(messages);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = { createConversation, getConversations, createMessage, getMessages };
