@@ -1,14 +1,15 @@
 import React from 'react';
 import Sidebar from '../components/Sidebar';
+import Chat from '../components/Chat';
 
 export default function Home() {
   return (
-    <div style={{ display: 'flex' }}>
-      <div style={{ flex: '0 0 25%', borderRight: '1px solid #ccc' }}>
+    <div style={{ display: 'flex', height: '100vh' }}>
+      <div style={{ width: '25%', borderRight: '1px solid #ccc', overflowY: 'auto' }}>
         <Sidebar />
       </div>
-      <div style={{ flex: 1, padding: '20px' }}>
-        <h1>Welcome to TreeGPT</h1>
+      <div style={{ width: '75%', padding: '20px' }}>
+        <Chat />
       </div>
     </div>
   );
