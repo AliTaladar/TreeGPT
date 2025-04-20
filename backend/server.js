@@ -16,10 +16,13 @@ connectDB();
 // Global middleware
 app.use(cors({
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   origin: '*',
   methods: '*',
   allowedHeaders: '*',
 =======
+=======
+>>>>>>> Stashed changes
   origin: process.env.FRONTEND_URL || '*',
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type', 'Authorization'],
