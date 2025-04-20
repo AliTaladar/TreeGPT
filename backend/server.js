@@ -8,7 +8,7 @@ const userRoutes = require('./routes/userRoutes');
 const conversationRoutes = require('./routes/conversationRoutes');
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3001;
 
 
 
