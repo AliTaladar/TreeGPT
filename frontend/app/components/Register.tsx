@@ -17,7 +17,7 @@ const Register: React.FC<RegisterProps> = ({ onRegister, toggleForm }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:3001/auth/register', {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
         username,
         email,
         password,
