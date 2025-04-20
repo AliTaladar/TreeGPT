@@ -51,4 +51,17 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { register, login };
+const getUserProfile = async (req, res) => {
+  try {
+    // req.user is set by the auth middleware, containing the decoded JWT payload (user ID)
+    const user = await User.findById(req.user.id).select('email');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.status(200).json({ email: user.email });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error });
+  }
+};
+
+module.exports = { register, login, getUserProfile };

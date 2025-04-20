@@ -1,0 +1,18 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Tree branch structure -->
+  <path d="M100 40 L100 130 L100 155" stroke="#4B5563" stroke-width="4" stroke-linecap="round"/>
+  <path d="M100 70 L60 100" stroke="#4B5563" stroke-width="4" stroke-linecap="round"/>
+  <path d="M100 70 L140 100" stroke="#4B5563" stroke-width="4" stroke-linecap="round"/>
+  <path d="M100 100 L70 130" stroke="#4B5563" stroke-width="4" stroke-linecap="round"/>
+  <path d="M100 100 L130 130" stroke="#4B5563" stroke-width="4" stroke-linecap="round"/>
+  
+  <!-- Node circles -->
+  <circle cx="100" cy="40" r="8" fill="#4B5563" stroke="#4B5563" stroke-width="2"/>
+  <circle cx="60" cy="100" r="8" fill="#4B5563" stroke="#4B5563" stroke-width="2"/>
+  <circle cx="140" cy="100" r="8" fill="#4B5563" stroke="#4B5563" stroke-width="2"/>
+  <circle cx="70" cy="130" r="8" fill="#4B5563" stroke="#4B5563" stroke-width="2"/>
+  <circle cx="130" cy="130" r="8" fill="#4B5563" stroke="#4B5563" stroke-width="2"/>
+  
+  <!-- Pencil base -->
+  <path d="M100 155 L90 180 L110 180 Z" fill="#4B5563" stroke="#4B5563" stroke-width="2"/>
+</svg> 
