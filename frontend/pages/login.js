@@ -1,32 +1,22 @@
 import { useState } from 'react';
+import { useRouter } from 'next/router';
+import axios from 'axios';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const router = useRouter();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage('');
-
+    setError('');
     try {
-      const response = await fetch('http://localhost:5000/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setMessage('Logged in!');
-      } else {
-        setMessage(data.message || 'Login failed');
-      }
-    } catch (error) {
-      setMessage('An error occurred. Please try again.');
+      const response = await axios.post('http://localhost:5000/auth/login', { email, password });
+      localStorage.setItem('token', response.data.token);
+      router.push('/');
+    } catch (err) {
+      setError(err.response?.data.message || 'Invalid credentials');
     }
   };
 
@@ -36,22 +26,22 @@ export default function Login() {
         <h2>Login</h2>
         <input
           type="email"
-          placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
           style={{ padding: '8px', fontSize: '16px' }}
         />
         <input
           type="password"
-          placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
           style={{ padding: '8px', fontSize: '16px' }}
         />
         <button type="submit" style={{ padding: '10px', fontSize: '16px', cursor: 'pointer' }}>
           Login
         </button>
-        {message && <p style={{ color: message === 'Logged in!' ? 'green' : 'red' }}>{message}</p>}
+        {error && <p style={{ color: 'red' }}>{error}</p>}
       </form>
     </div>
   );

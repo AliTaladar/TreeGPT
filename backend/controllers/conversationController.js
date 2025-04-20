@@ -38,7 +38,7 @@ const getConversations = async (req, res) => {
 
 
 const createMessage = async (req, res) => {
-  const { content } = req.body;
+  const { content, parentId } = req.body;
   const conversationId = req.params.id;
   const userId = req.user.id;
 
@@ -52,14 +52,20 @@ const createMessage = async (req, res) => {
       return res.status(404).json({ message: 'Conversation not found' });
     }
 
+    if (parentId) {
+      const parentMessage = await Message.findOne({ _id: parentId, conversationId });
+      if (!parentMessage) {
+        return res.status(400).json({ message: 'Invalid parentId' });
+      }
+    }
+
     const newMessage = new Message({
       conversationId,
-      parentId: null,
+      parentId: parentId || null,
       type: 'user',
       content,
       timestamp: new Date(),
     });
-
     await newMessage.save();
 
     const completion = await openai.chat.completions.create({
@@ -70,14 +76,14 @@ const createMessage = async (req, res) => {
 
     const assistantMessage = new Message({
       conversationId,
-      parentId: null,
+      parentId: newMessage._id, // AI response is a child of the user message
       type: 'assistant',
       content: assistantResponse,
       timestamp: new Date(),
     });
     await assistantMessage.save();
 
-    res.status(201).json(newMessage);
+    res.status(201).json([newMessage, assistantMessage]);
   } catch (error) {
     if (error instanceof Error && error.message.includes('OpenAI')) {
       return res.status(500).json({ message: 'Failed to generate AI response' });

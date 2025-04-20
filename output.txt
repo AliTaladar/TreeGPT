@@ -1,0 +1,693 @@
+Project structure for: C:\source\repos\TreeGPT
+TreeGPT
+├── backend
+|   ├── controllers
+|   |   ├── authController.js
+|   |   └── conversationController.js
+|   ├── db.js
+|   ├── middleware
+|   |   └── auth.js
+|   ├── models
+|   |   ├── Conversation.js
+|   |   ├── Message.js
+|   |   └── User.js
+|   ├── routes
+|   |   ├── conversationRoutes.js
+|   |   └── userRoutes.js
+|   └── server.js
+├── frontend
+|   ├── components
+|   |   ├── Chat.js
+|   |   └── Sidebar.js
+|   ├── next.config.mjs
+|   └── pages
+|       ├── index.js
+|       ├── login.js
+|       └── register.js
+└── shared
+
+========================================
+File Contents:
+========================================
+
+.\backend\db.js:
+const mongoose = require('mongoose');
+
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log('Connected to MongoDB');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    process.exit(1);
+  }
+};
+
+module.exports = connectDB;--------------------
+.\backend\server.js:
+// server.js
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const connectDB = require('./db');
+
+const userRoutes = require('./routes/userRoutes');
+const conversationRoutes = require('./routes/conversationRoutes');
+
+const app = express();
+const port = 5000;
+
+
+// Connect to MongoDB
+connectDB();
+
+// Global middleware
+app.use(cors({
+  origin: 'http://localhost:3000',
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+app.use(express.json());
+
+// Mount routes
+app.use('/auth', userRoutes);         // Endpoints: /auth/register, /auth/login
+app.use('/conversations', conversationRoutes); // Endpoint: /conversations
+
+// Start server
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});--------------------
+.\backend\controllers\authController.js:
+// controllers/authController.js
+const User = require('../models/User');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+
+const register = async (req, res) => {
+  const { username, email, password } = req.body;
+
+  if (!username || !email || !password) {
+    return res.status(400).json({ message: 'All fields are required' });
+  }
+
+  try {
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = new User({ username, email, password: hashedPassword });
+    await newUser.save();
+
+    res.status(201).json({ message: 'User registered successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error });
+  }
+};
+
+const login = async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required' });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: 'Email does not exist' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'That is not the correct password, try again.' });
+    }
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+    res.status(200).json({ token });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error });
+  }
+};
+
+module.exports = { register, login };--------------------
+.\backend\controllers\conversationController.js:
+// controllers/conversationController.js
+const Conversation = require('../models/Conversation');
+const Message = require('../models/Message');
+const { OpenAI } = require('openai');
+
+
+// Initialize OpenAI client
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const createConversation = async (req, res) => {
+  const { title } = req.body;
+
+  if (!title) {
+    return res.status(400).json({ message: 'Title is required' });
+  }
+
+  try {
+    const newConversation = new Conversation({
+      userId: req.user.id, // From JWT payload
+      title,
+    });
+    await newConversation.save();
+    res.status(201).json(newConversation);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const getConversations = async (req, res) => {
+  try {
+    const conversations = await Conversation.find({ userId: req.user.id });
+    res.status(200).json(conversations);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+const createMessage = async (req, res) => {
+  const { content, parentId } = req.body;
+  const conversationId = req.params.id;
+  const userId = req.user.id;
+
+  if (!content) {
+    return res.status(400).json({ message: 'Content is required' });
+  }
+
+  try {
+    const conversation = await Conversation.findOne({ _id: conversationId, userId });
+    if (!conversation) {
+      return res.status(404).json({ message: 'Conversation not found' });
+    }
+
+    if (parentId) {
+      const parentMessage = await Message.findOne({ _id: parentId, conversationId });
+      if (!parentMessage) {
+        return res.status(400).json({ message: 'Invalid parentId' });
+      }
+    }
+
+    const newMessage = new Message({
+      conversationId,
+      parentId: parentId || null,
+      type: 'user',
+      content,
+      timestamp: new Date(),
+    });
+    await newMessage.save();
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content }],
+    });
+    const assistantResponse = completion.choices[0].message.content;
+
+    const assistantMessage = new Message({
+      conversationId,
+      parentId: newMessage._id, // AI response is a child of the user message
+      type: 'assistant',
+      content: assistantResponse,
+      timestamp: new Date(),
+    });
+    await assistantMessage.save();
+
+    res.status(201).json([newMessage, assistantMessage]);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('OpenAI')) {
+      return res.status(500).json({ message: 'Failed to generate AI response' });
+    }
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const getMessages = async (req, res) => {
+  const conversationId = req.params.id;
+  const userId = req.user.id;
+
+  try {
+    const conversation = await Conversation.findOne({ _id: conversationId, userId });
+    if (!conversation) {
+      return res.status(404).json({ message: 'Conversation not found' });
+    }
+
+    const messages = await Message.find({ conversationId }).sort({ timestamp: 1 });
+    res.status(200).json(messages);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = { createConversation, getConversations, createMessage, getMessages };--------------------
+.\backend\middleware\auth.js:
+require('dotenv').config();
+const { expressjwt: expressJwt } = require('express-jwt');
+
+const jwtMiddleware = expressJwt({
+  secret: process.env.JWT_SECRET,
+  algorithms: ['HS256'],
+  requestProperty: 'user',
+});
+
+module.exports = jwtMiddleware;--------------------
+.\backend\models\Conversation.js:
+const mongoose = require('mongoose');
+
+const conversationSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  title: {
+    type: String,
+    required: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+module.exports = mongoose.model('Conversation', conversationSchema);--------------------
+.\backend\models\Message.js:
+const mongoose = require('mongoose');
+
+const messageSchema = new mongoose.Schema({
+  conversationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Conversation',
+    required: true
+  },
+  parentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message',
+    default: null
+  },
+  type: {
+    type: String,
+    enum: ['user', 'assistant'],
+    required: true
+  },
+  content: {
+    type: String,
+    required: true
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+module.exports = mongoose.model('Message', messageSchema);--------------------
+.\backend\models\User.js:
+const mongoose = require('mongoose');
+
+const userSchema = new mongoose.Schema({
+  username: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  password: {
+    type: String,
+    required: true,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+module.exports = mongoose.model('User', userSchema);--------------------
+.\backend\routes\conversationRoutes.js:
+const express = require('express');
+const router = express.Router();
+const { createConversation, getConversations, createMessage, getMessages } = require('../controllers/conversationController');
+const jwtMiddleware = require('../middleware/auth');
+
+router.post('/', jwtMiddleware, createConversation);
+router.get('/', jwtMiddleware, getConversations);
+router.post('/:id/messages', jwtMiddleware, createMessage);
+router.get('/:id/messages', jwtMiddleware, getMessages);
+
+module.exports = router;--------------------
+.\backend\routes\userRoutes.js:
+const express = require('express');
+const router = express.Router();
+const { register, login } = require('../controllers/authController');
+
+router.post('/register', register);
+router.post('/login', login);
+
+module.exports = router;--------------------
+.\frontend\next.config.mjs:
+/** @type {import('next').NextConfig} */
+const nextConfig = {}
+
+export default nextConfig--------------------
+.\frontend\components\Chat.js:
+import { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+
+export default function Chat({ conversationId }) {
+  const [messages, setMessages] = useState([]);
+  const [content, setContent] = useState('');
+  const [currentParentId, setCurrentParentId] = useState(null); // Tracks parentId for next user message
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    if (conversationId) {
+      const fetchMessages = async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await axios.get(`http://localhost:5000/conversations/${conversationId}/messages`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setMessages(response.data);
+          // Set currentParentId to the last user message's _id, if any
+          const lastUserMessage = response.data
+            .filter((msg) => msg.type === 'user')
+            .pop();
+          setCurrentParentId(lastUserMessage ? lastUserMessage._id : null);
+        } catch (error) {
+          console.error('Error fetching messages:', error);
+        }
+      };
+      fetchMessages();
+    }
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!content.trim()) return;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`http://localhost:5000/conversations/${conversationId}/messages`, {
+        content,
+        parentId: currentParentId,
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const [userMessage, assistantMessage] = response.data;
+      setMessages([...messages, userMessage, assistantMessage]);
+      setCurrentParentId(userMessage._id); // Next user message will use this user message's _id as parentId
+      setContent('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
+  if (!conversationId) {
+    return <p>Select a conversation</p>;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ flex: 1, overflowY: 'auto', maxHeight: '400px', padding: '10px' }}>
+        {messages.map((message) => (
+          <div
+            key={message._id}
+            style={{
+              display: 'flex',
+              justifyContent: message.type === 'user' ? 'flex-end' : 'flex-start',
+              margin: '5px 0',
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: message.type === 'user' ? '#DCF8C6' : '#FFFFFF',
+                padding: '10px',
+                borderRadius: '10px',
+                maxWidth: '70%',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+              }}
+            >
+              <p style={{ margin: '0' }}>{message.content}</p>
+              <small style={{ color: '#666', fontSize: '0.8em' }}>
+                {new Date(message.timestamp).toLocaleTimeString()}
+              </small>
+            </div>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+      <form onSubmit={handleSend} style={{ display: 'flex', marginTop: '10px', padding: '10px' }}>
+        <input
+          type="text"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          style={{ flex: 1, padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }}
+          placeholder="Type your message..."
+        />
+        <button
+          type="submit"
+          style={{
+            padding: '10px 20px',
+            marginLeft: '10px',
+            backgroundColor: '#0070f3',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+          }}
+        >
+          Send
+        </button>
+      </form>
+    </div>
+  );
+}--------------------
+.\frontend\components\Sidebar.js:
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+
+export default function Sidebar({ onConversationSelect }) {
+  const [conversations, setConversations] = useState([]);
+  const [title, setTitle] = useState('');
+  const [selectedId, setSelectedId] = useState(null);
+
+  useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get('http://localhost:5000/conversations', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        console.log(response.data);
+        setConversations(response.data);
+      } catch (error) {
+        console.error('Error fetching conversations:', error);
+      }
+    };
+    fetchConversations();
+  }, []);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post('http://localhost:5000/conversations', { title }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setConversations([...conversations, response.data]);
+      setTitle('');
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+    }
+  };
+
+  const handleSelect = (id) => {
+    setSelectedId(id);
+    onConversationSelect(id);
+  };
+
+  return (
+    <div style={{ padding: '10px' }}>
+      <h2>Conversations</h2>
+      <ul style={{ listStyle: 'none', padding: 0 }}>
+        {conversations.map((conv) => (
+          <li
+            key={conv._id}
+            onClick={() => handleSelect(conv._id)}
+            style={{
+              margin: '5px 0',
+              backgroundColor: selectedId === conv._id ? '#ccc' : 'transparent',
+              cursor: 'pointer',
+            }}
+          >
+            {conv.title}
+          </li>
+        ))}
+      </ul>
+      <form onSubmit={handleCreate} style={{ marginTop: '20px' }}>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="New conversation title"
+          style={{ padding: '5px', width: '100%' }}
+        />
+        <button type="submit" style={{ marginTop: '10px', padding: '5px' }}>
+          Create
+        </button>
+      </form>
+    </div>
+  );
+}--------------------
+.\frontend\pages\index.js:
+import { useState } from 'react';
+import Sidebar from '../components/Sidebar';
+import Chat from '../components/Chat';
+
+export default function Home() {
+  const [selectedConversationId, setSelectedConversationId] = useState(null);
+
+  return (
+    <div style={{ display: 'flex', height: '100vh' }}>
+      <div style={{ width: '25%', borderRight: '1px solid #ccc', overflowY: 'auto' }}>
+        <Sidebar onConversationSelect={setSelectedConversationId} />
+      </div>
+      <div style={{ width: '75%', padding: '20px' }}>
+        <Chat conversationId={selectedConversationId} />
+      </div>
+    </div>
+  );
+}--------------------
+.\frontend\pages\login.js:
+import { useState } from 'react';
+import { useRouter } from 'next/router';
+import axios from 'axios';
+
+export default function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const router = useRouter();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      const response = await axios.post('http://localhost:5000/auth/login', { email, password });
+      localStorage.setItem('token', response.data.token);
+      router.push('/');
+    } catch (err) {
+      setError(err.response?.data.message || 'Invalid credentials');
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <h2>Login</h2>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          style={{ padding: '8px', fontSize: '16px' }}
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          style={{ padding: '8px', fontSize: '16px' }}
+        />
+        <button type="submit" style={{ padding: '10px', fontSize: '16px', cursor: 'pointer' }}>
+          Login
+        </button>
+        {error && <p style={{ color: 'red' }}>{error}</p>}
+      </form>
+    </div>
+  );
+}--------------------
+.\frontend\pages\register.js:
+import { useState } from 'react';
+
+export default function Register() {
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMessage('');
+
+    try {
+      const response = await fetch('http://localhost:5000/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage(data.message || 'User registered successfully');
+      } else {
+        setMessage(data.message || 'Registration failed');
+      }
+    } catch (error) {
+      setMessage('An error occurred. Please try again.');
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <h2>Register</h2>
+        <input
+          type="text"
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          style={{ padding: '8px', fontSize: '16px' }}
+        />
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{ padding: '8px', fontSize: '16px' }}
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{ padding: '8px', fontSize: '16px' }}
+        />
+        <button type="submit" style={{ padding: '10px', fontSize: '16px', cursor: 'pointer' }}>
+          Register
+        </button>
+        {message && <p style={{ color: message.includes('successfully') ? 'green' : 'red' }}>{message}</p>}
+      </form>
+    </div>
+  );
+}--------------------

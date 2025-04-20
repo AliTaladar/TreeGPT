@@ -1,40 +1,67 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 
-export default function Chat() {
-  const [messages, setMessages] = useState([
-    { _id: '1', type: 'assistant', content: 'Hello! How can I assist you today?', timestamp: '2023-10-01T12:00:00Z' },
-    { _id: '2', type: 'user', content: 'I have a question about TreeGPT.', timestamp: '2023-10-01T12:01:00Z' },
-    { _id: '3', type: 'assistant', content: 'Sure, what would you like to know?', timestamp: '2023-10-01T12:02:00Z' },
-    { _id: '4', type: 'user', content: 'How does branching work?', timestamp: '2023-10-01T12:03:00Z' },
-    { _id: '5', type: 'assistant', content: 'Branching lets you explore multiple paths in a conversation!', timestamp: '2023-10-01T12:04:00Z' },
-  ]);
-  const [input, setInput] = useState('');
-  const messageRef = useRef(null);
-
-  const generateId = () => Math.random().toString(36).substr(2, 9);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-    const newMessage = {
-      _id: generateId(),
-      type: 'user',
-      content: input,
-      timestamp: new Date().toISOString(),
-    };
-    setMessages([...messages, newMessage]);
-    setInput('');
-  };
+export default function Chat({ conversationId }) {
+  const [messages, setMessages] = useState([]);
+  const [content, setContent] = useState('');
+  const [currentParentId, setCurrentParentId] = useState(null); // Tracks parentId for next user message
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    if (messageRef.current) {
-      messageRef.current.scrollTop = messageRef.current.scrollHeight;
+    if (conversationId) {
+      const fetchMessages = async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await axios.get(`http://localhost:5000/conversations/${conversationId}/messages`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setMessages(response.data);
+          // Set currentParentId to the last user message's _id, if any
+          const lastUserMessage = response.data
+            .filter((msg) => msg.type === 'user')
+            .pop();
+          setCurrentParentId(lastUserMessage ? lastUserMessage._id : null);
+        } catch (error) {
+          console.error('Error fetching messages:', error);
+        }
+      };
+      fetchMessages();
+    }
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
 
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!content.trim()) return;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`http://localhost:5000/conversations/${conversationId}/messages`, {
+        content,
+        parentId: currentParentId,
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const [userMessage, assistantMessage] = response.data;
+      setMessages([...messages, userMessage, assistantMessage]);
+      setCurrentParentId(userMessage._id); // Next user message will use this user message's _id as parentId
+      setContent('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
+  if (!conversationId) {
+    return <p>Select a conversation</p>;
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div ref={messageRef} style={{ flex: 1, overflowY: 'auto', maxHeight: '400px', padding: '10px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', maxHeight: '400px', padding: '10px' }}>
         {messages.map((message) => (
           <div
             key={message._id}
@@ -60,12 +87,13 @@ export default function Chat() {
             </div>
           </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', marginTop: '10px', padding: '10px' }}>
+      <form onSubmit={handleSend} style={{ display: 'flex', marginTop: '10px', padding: '10px' }}>
         <input
           type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
           style={{ flex: 1, padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }}
           placeholder="Type your message..."
         />

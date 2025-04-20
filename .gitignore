@@ -42,3 +42,6 @@ desktop.ini
 
 # Coverage reports
 coverage/
+
+# other
+*.py
