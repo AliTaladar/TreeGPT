@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 interface RegisterProps {
   onRegister: () => void;
@@ -17,10 +17,18 @@ const Register: React.FC<RegisterProps> = ({ onRegister, toggleForm }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/auth/register', { username, email, password });
+      const response = await axios.post('http://localhost:3001/auth/register', {
+        username,
+        email,
+        password,
+      });
+      localStorage.setItem('token', response.data.token);
       onRegister();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
+    } catch (err) {
+      const errorMsg = err instanceof AxiosError
+        ? err.response?.data?.message || err.message
+        : 'Registration failed';
+      setError(errorMsg);
     }
   };
 

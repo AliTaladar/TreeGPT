@@ -22,7 +22,6 @@ interface Message {
   parentId: string | null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function BranchingPrompts() {
   const [nodes, setNodes] = useState<Record<string, NodeData>>(() => {
     const rootId = uuidv4();
@@ -68,10 +67,22 @@ export default function BranchingPrompts() {
         try {
           const token = localStorage.getItem('token');
           if (token) {
-            const response = await axios.get('http://localhost:5000/conversations', {
+            const response = await axios.get('http://localhost:3001/conversations', {
               headers: { Authorization: `Bearer ${token}` },
             });
-            setConversations(response.data);
+            // Sort conversations by newest first (assuming _id or response data contains a createdAt)
+            const sortedConversations = [...response.data].sort((a, b) => {
+              // Try multiple sorting strategies
+              if (a.updatedAt && b.updatedAt) {
+                return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+              }
+              if (a.createdAt && b.createdAt) {
+                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+              }
+              // Fallback to _id (MongoDB ObjectIDs have creation time embedded)
+              return b._id.localeCompare(a._id);
+            });
+            setConversations(sortedConversations);
           }
         } catch (error) {
           console.error('Error fetching conversations:', error);
@@ -90,7 +101,7 @@ export default function BranchingPrompts() {
           const token = localStorage.getItem('token');
           if (token) {
             const response = await axios.get<Message[]>(
-              `http://localhost:5000/conversations/${selectedConversationId}/messages`,
+              `http://localhost:3001/conversations/${selectedConversationId}/messages`,
               {
                 headers: { Authorization: `Bearer ${token}` },
               }
@@ -113,7 +124,7 @@ export default function BranchingPrompts() {
         try {
           const token = localStorage.getItem('token');
           if (token) {
-            const response = await axios.get('http://localhost:5000/auth/me', {
+            const response = await axios.get('http://localhost:3001/auth/me', {
               headers: { Authorization: `Bearer ${token}` },
             });
             setUserEmail(response.data.email);
@@ -237,13 +248,13 @@ export default function BranchingPrompts() {
       try {
         const token = localStorage.getItem('token');
         if (!selectedConversationId) {
-          const convResponse = await axios.post('http://localhost:5000/conversations', { title: 'New Conversation' }, {
+          const convResponse = await axios.post('http://localhost:3001/conversations', { title: 'New Conversation' }, {
             headers: { Authorization: `Bearer ${token}` },
           });
           const newConversation = convResponse.data;
           setSelectedConversationId(newConversation._id);
           setConversations(prev => [...prev, newConversation]);
-          const msgResponse = await axios.post(`http://localhost:5000/conversations/${newConversation._id}/messages`, {
+          const msgResponse = await axios.post(`http://localhost:3001/conversations/${newConversation._id}/messages`, {
             content: userInput,
             parentId: null,
           }, {
@@ -254,7 +265,7 @@ export default function BranchingPrompts() {
           setCurrentNodeId(newUserMessage._id);
         } else {
           const parentId = currentNodeId ? getAssistantMessageId(currentNodeId) : null;
-          const response = await axios.post(`http://localhost:5000/conversations/${selectedConversationId}/messages`, {
+          const response = await axios.post(`http://localhost:3001/conversations/${selectedConversationId}/messages`, {
             content: userInput,
             parentId,
           }, {
@@ -283,7 +294,7 @@ export default function BranchingPrompts() {
     setIsLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(`http://localhost:5000/conversations/${selectedConversationId}/messages`, {
+      const response = await axios.post(`http://localhost:3001/conversations/${selectedConversationId}/messages`, {
         content: prompt,
         parentId: parentAssistantId,
       }, {
@@ -554,13 +565,15 @@ export default function BranchingPrompts() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto">
-            {conversations.map(convo => (
+            {conversations
+              .slice() // Create a copy to avoid mutating original
+              .sort((a, b) => b._id.localeCompare(a._id)) // Simple string comparison (newer IDs are larger)
+              .map(convo => (
               <div key={convo._id} className="border-b border-gray-100">
                 <button
                   className="w-full text-left px-4 py-3 hover:bg-white focus:outline-none transition-colors flex justify-between items-center"
                   onClick={() => {
                     setSelectedConversationId(convo._id);
-                    
                   }}
                 >
                   <div className="truncate text-sm font-medium text-gray-700">{convo.title}</div>

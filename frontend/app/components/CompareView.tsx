@@ -31,8 +31,9 @@ function highlightDiff(textA: string, textB: string): { marked: string, added: b
 }
 
 export default function CompareView({ leftNode, rightNode, onClose }: CompareViewProps) {
-  const promptDiff = highlightDiff(leftNode.prompt, rightNode.prompt);
-  const responseDiff = highlightDiff(leftNode.response, rightNode.response);
+  // Add default empty strings to handle undefined values
+  const promptDiff = highlightDiff(leftNode.prompt || '', rightNode.prompt || '');
+  const responseDiff = highlightDiff(leftNode.response || '', rightNode.response || '');
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

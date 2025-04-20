@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 interface LoginProps {
   onLogin: () => void;
@@ -16,11 +16,14 @@ const Login: React.FC<LoginProps> = ({ onLogin, toggleForm }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:5000/auth/login', { email, password });
+      const response = await axios.post('http://localhost:3001/auth/login', { email, password });
       localStorage.setItem('token', response.data.token);
       onLogin();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
+    } catch (err) {
+      const errorMsg = err instanceof AxiosError 
+        ? err.response?.data?.message || err.message 
+        : 'Login failed';
+      setError(errorMsg);
     }
   };
 
