@@ -357,13 +357,7 @@ export default function BranchingPrompts() {
   // Add a function to handle creating a new conversation
   const handleNewConversation = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:5000/conversations', { title: 'New Conversation' }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const newConversation = response.data;
-      setConversations(prev => [...prev, newConversation]);
-      setSelectedConversationId(newConversation._id);
+      setSelectedConversationId(null);
     } catch (error) {
       console.error('Error creating conversation:', error);
     }
