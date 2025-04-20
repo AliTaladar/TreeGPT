@@ -2,11 +2,12 @@
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const { OpenAI } = require('openai');
+const Anthropic = require('@anthropic-ai/sdk');
 const mongoose = require('mongoose');
 
 async function getBranchHistory(parentId, conversationId, remainingSteps) {
   if (!parentId || remainingSteps == 0) return [];
-  
+
   // Convert parentId to ObjectId if it's a string
   const messageId = new mongoose.Types.ObjectId(parentId);
 
@@ -32,6 +33,9 @@ async function getBranchHistory(parentId, conversationId, remainingSteps) {
 
 // Initialize OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Initialize Anthropic client
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
 
 const createConversation = async (req, res) => {
   const { title } = req.body;
@@ -100,18 +104,34 @@ const createMessage = async (req, res) => {
     const history = parentObjectId ? await getBranchHistory(parentObjectId, conversationObjectId, 10) : [];
     history.push(newMessage);
 
-    // Format history for OpenAI API
-    const openAIMessages = [
-      { role: 'system', content: 'You are an assistant who remembers the entire conversation history. Use all provided messages to inform your responses.' },
-      ...history.map(msg => ({ role: msg.type, content: msg.content }))
-    ];
+    // // Format history for OpenAI API
+    // const openAIMessages = [
+    //   { role: 'system', content: 'You are an assistant who remembers the entire conversation history. Use all provided messages to inform your responses.' },
+    //   ...history.map(msg => ({ role: msg.type, content: msg.content }))
+    // ];
 
-    // Call OpenAI with the full branch history
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: openAIMessages,
+    // // Call OpenAI with the full branch history
+    // const completion = await openai.chat.completions.create({
+    //   model: 'gpt-3.5-turbo',
+    //   messages: openAIMessages,
+    // });
+
+    // const assistantResponse = completion.choices[0].message.content;
+
+    // Format history for Anthropic API
+    const anthropicMessages = history.map(msg => ({ role: msg.type === 'user' ? 'user' : 'assistant', content: msg.content }));
+
+    // Add system prompt as a separate parameter
+    const systemPrompt = 'You are an assistant who remembers the entire conversation history. Use all provided messages to inform your responses.';
+
+    // Call Anthropic API
+    const response = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      messages: anthropicMessages,
+      system: systemPrompt,
+      max_tokens: 1024
     });
-    const assistantResponse = completion.choices[0].message.content;
+    const assistantResponse = response.content[0].text;
 
     const assistantMessage = new Message({
       conversationId: conversationObjectId,
@@ -125,7 +145,7 @@ const createMessage = async (req, res) => {
     res.status(201).json([newMessage, assistantMessage]);
   } catch (error) {
     console.error('Error in createMessage:', error);
-    if (error instanceof Error && error.message.includes('OpenAI')) {
+    if (error instanceof Error && error.message.includes('Anthropic')) {
       return res.status(500).json({ message: 'Failed to generate AI response' });
     }
     res.status(500).json({ message: 'Server error', error: error.message });
