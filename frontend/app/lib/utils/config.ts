@@ -1,7 +1,7 @@
 // Environment configuration and API endpoints
 
 // Default API URL with fallback to localhost for development
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 // API endpoints
 export const API_ENDPOINTS = {

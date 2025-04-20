@@ -67,7 +67,7 @@ export default function BranchingPrompts() {
         try {
           const token = localStorage.getItem('token');
           if (token) {
-            const response = await axios.get('http://localhost:3001/conversations', {
+            const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/conversations`, {
               headers: { Authorization: `Bearer ${token}` },
             });
             // Sort conversations by newest first (assuming _id or response data contains a createdAt)
@@ -101,7 +101,7 @@ export default function BranchingPrompts() {
           const token = localStorage.getItem('token');
           if (token) {
             const response = await axios.get<Message[]>(
-              `http://localhost:3001/conversations/${selectedConversationId}/messages`,
+              `${process.env.NEXT_PUBLIC_API_URL}/conversations/${selectedConversationId}/messages`,
               {
                 headers: { Authorization: `Bearer ${token}` },
               }
@@ -124,7 +124,7 @@ export default function BranchingPrompts() {
         try {
           const token = localStorage.getItem('token');
           if (token) {
-            const response = await axios.get('http://localhost:3001/auth/me', {
+            const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
               headers: { Authorization: `Bearer ${token}` },
             });
             setUserEmail(response.data.email);
@@ -248,13 +248,13 @@ export default function BranchingPrompts() {
       try {
         const token = localStorage.getItem('token');
         if (!selectedConversationId) {
-          const convResponse = await axios.post('http://localhost:3001/conversations', { title: 'New Conversation' }, {
+          const convResponse = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/conversations`, { title: 'New Conversation' }, {
             headers: { Authorization: `Bearer ${token}` },
           });
           const newConversation = convResponse.data;
           setSelectedConversationId(newConversation._id);
           setConversations(prev => [...prev, newConversation]);
-          const msgResponse = await axios.post(`http://localhost:3001/conversations/${newConversation._id}/messages`, {
+          const msgResponse = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/conversations/${newConversation._id}/messages`, {
             content: userInput,
             parentId: null,
           }, {
@@ -265,7 +265,7 @@ export default function BranchingPrompts() {
           setCurrentNodeId(newUserMessage._id);
         } else {
           const parentId = currentNodeId ? getAssistantMessageId(currentNodeId) : null;
-          const response = await axios.post(`http://localhost:3001/conversations/${selectedConversationId}/messages`, {
+          const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/conversations/${selectedConversationId}/messages`, {
             content: userInput,
             parentId,
           }, {
@@ -294,7 +294,7 @@ export default function BranchingPrompts() {
     setIsLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(`http://localhost:3001/conversations/${selectedConversationId}/messages`, {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/conversations/${selectedConversationId}/messages`, {
         content: prompt,
         parentId: parentAssistantId,
       }, {
