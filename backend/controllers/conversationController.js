@@ -1,6 +1,11 @@
 // controllers/conversationController.js
 const Conversation = require('../models/Conversation');
-const Message = require('../models/Message')
+const Message = require('../models/Message');
+const { OpenAI } = require('openai');
+
+
+// Initialize OpenAI client
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const createConversation = async (req, res) => {
   const { title } = req.body;
@@ -56,9 +61,27 @@ const createMessage = async (req, res) => {
     });
 
     await newMessage.save();
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content }],
+    });
+    const assistantResponse = completion.choices[0].message.content;
+
+    const assistantMessage = new Message({
+      conversationId,
+      parentId: null,
+      type: 'assistant',
+      content: assistantResponse,
+      timestamp: new Date(),
+    });
+    await assistantMessage.save();
+
     res.status(201).json(newMessage);
   } catch (error) {
-    console.log(error);
+    if (error instanceof Error && error.message.includes('OpenAI')) {
+      return res.status(500).json({ message: 'Failed to generate AI response' });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 };
