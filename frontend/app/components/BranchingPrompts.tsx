@@ -248,7 +248,7 @@ export default function BranchingPrompts() {
       try {
         const token = localStorage.getItem('token');
         if (!selectedConversationId) {
-          const convResponse = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/conversations`, { title: 'New Conversation' }, {
+          const convResponse = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/conversations`, { title: userInput }, {
             headers: { Authorization: `Bearer ${token}` },
           });
           const newConversation = convResponse.data;
