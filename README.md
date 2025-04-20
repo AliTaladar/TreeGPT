@@ -1,4 +1,4 @@
-# TreeGPT
+# TreeGPT 🌲
 
 TreeGPT is a branching conversation application that allows users to explore multiple AI responses to the same prompt, creating a tree-like conversation structure instead of a linear chat.
 
@@ -23,7 +23,7 @@ TreeGPT is a branching conversation application that allows users to explore mul
 - Node.js/Express server
 - MongoDB database
 - JWT authentication
-- Claude and OpenAI API integration
+- Claude integration
 - Render for deployment
 
 ## Deployment
