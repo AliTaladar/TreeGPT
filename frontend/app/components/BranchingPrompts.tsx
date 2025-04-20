@@ -129,6 +129,8 @@ export default function BranchingPrompts() {
     }
   }, [isAuthenticated]);
 
+  // const 
+
   const buildTree = useCallback((messages: Message[]): Record<string, NodeData> => {
     const messageMap = new Map(messages.map(msg => [msg._id, msg]));
 
@@ -158,6 +160,7 @@ export default function BranchingPrompts() {
     if (rootUserMessages.length === 0) {
       return {};
     }
+
     const rootUserId = rootUserMessages[0]._id;
     const nodes: Record<string, NodeData> = {};
     const queue: { userId: string; parentUserId: string | null }[] = [
@@ -183,10 +186,21 @@ export default function BranchingPrompts() {
       if (rootUserMessage) {
         setNodes(treeNodes);
         setRootId(rootUserMessage._id);
+
+        const latestUserMessage = messages.reduce<Message | null>((latest: Message | null, msg: Message) => {
+          if (msg.type === 'user') {
+            return !latest || new Date(msg.timestamp) > new Date(latest.timestamp) ? msg : latest;
+          }
+          return latest;
+        }, null);
+        if (latestUserMessage) {
+          setCurrentNodeId(latestUserMessage._id);
+        }
       }
     } else {
       setNodes({});
       setRootId(null);
+      setCurrentNodeId(null); // Reset when there are no messages
     }
   }, [messages, buildTree]);
 
@@ -544,7 +558,10 @@ export default function BranchingPrompts() {
               <div key={convo._id} className="border-b border-gray-100">
                 <button
                   className="w-full text-left px-4 py-3 hover:bg-white focus:outline-none transition-colors flex justify-between items-center"
-                  onClick={() => setSelectedConversationId(convo._id)}
+                  onClick={() => {
+                    setSelectedConversationId(convo._id);
+                    
+                  }}
                 >
                   <div className="truncate text-sm font-medium text-gray-700">{convo.title}</div>
                 </button>
