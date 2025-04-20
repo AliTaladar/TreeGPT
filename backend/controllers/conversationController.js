@@ -2,7 +2,33 @@
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const { OpenAI } = require('openai');
+const mongoose = require('mongoose');
 
+async function getBranchHistory(parentId, conversationId, remainingSteps) {
+  if (!parentId || remainingSteps == 0) return [];
+  
+  // Convert parentId to ObjectId if it's a string
+  const messageId = new mongoose.Types.ObjectId(parentId);
+
+  const message = await Message.findOne({ _id: messageId, conversationId });
+  if (!message) return [];
+
+  let history = [];
+  if (message.parentId) {
+    history = await getBranchHistory(message.parentId, conversationId, remainingSteps - 1);
+  }
+  history.push(message);
+
+  // If it's a user message, include its assistant response
+  if (message.type === 'user') {
+    const assistantMessage = await Message.findOne({ parentId: message._id, type: 'assistant' });
+    if (assistantMessage) {
+      history.push(assistantMessage);
+    }
+  }
+
+  return history;
+}
 
 // Initialize OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -22,7 +48,6 @@ const createConversation = async (req, res) => {
     await newConversation.save();
     res.status(201).json(newConversation);
   } catch (error) {
-    console.log(error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -36,7 +61,6 @@ const getConversations = async (req, res) => {
   }
 };
 
-
 const createMessage = async (req, res) => {
   const { content, parentId } = req.body;
   const conversationId = req.params.id;
@@ -47,35 +71,50 @@ const createMessage = async (req, res) => {
   }
 
   try {
-    const conversation = await Conversation.findOne({ _id: conversationId, userId });
+    // Convert IDs to ObjectId using 'new'
+    const conversationObjectId = new mongoose.Types.ObjectId(conversationId);
+    const parentObjectId = parentId ? new mongoose.Types.ObjectId(parentId) : null;
+
+    const conversation = await Conversation.findOne({ _id: conversationObjectId, userId });
     if (!conversation) {
       return res.status(404).json({ message: 'Conversation not found' });
     }
 
     if (parentId) {
-      const parentMessage = await Message.findOne({ _id: parentId, conversationId });
+      const parentMessage = await Message.findOne({ _id: parentObjectId, conversationId: conversationObjectId });
       if (!parentMessage) {
         return res.status(400).json({ message: 'Invalid parentId' });
       }
     }
 
     const newMessage = new Message({
-      conversationId,
-      parentId: parentId || null,
+      conversationId: conversationObjectId,
+      parentId: parentObjectId || null,
       type: 'user',
       content,
       timestamp: new Date(),
     });
     await newMessage.save();
 
+    // Fetch branch history and append the new message
+    const history = parentObjectId ? await getBranchHistory(parentObjectId, conversationObjectId, 10) : [];
+    history.push(newMessage);
+
+    // Format history for OpenAI API
+    const openAIMessages = [
+      { role: 'system', content: 'You are an assistant who remembers the entire conversation history. Use all provided messages to inform your responses.' },
+      ...history.map(msg => ({ role: msg.type, content: msg.content }))
+    ];
+
+    // Call OpenAI with the full branch history
     const completion = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content }],
+      messages: openAIMessages,
     });
     const assistantResponse = completion.choices[0].message.content;
 
     const assistantMessage = new Message({
-      conversationId,
+      conversationId: conversationObjectId,
       parentId: newMessage._id, // AI response is a child of the user message
       type: 'assistant',
       content: assistantResponse,
@@ -85,10 +124,11 @@ const createMessage = async (req, res) => {
 
     res.status(201).json([newMessage, assistantMessage]);
   } catch (error) {
+    console.error('Error in createMessage:', error);
     if (error instanceof Error && error.message.includes('OpenAI')) {
       return res.status(500).json({ message: 'Failed to generate AI response' });
     }
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
