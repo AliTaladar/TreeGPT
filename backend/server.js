@@ -10,8 +10,6 @@ const conversationRoutes = require('./routes/conversationRoutes');
 const app = express();
 const port = process.env.PORT || 3001;
 
-
-
 // Connect to MongoDB
 connectDB();
 
@@ -32,5 +30,12 @@ app.get('/', (req, res) => {
 app.use('/auth', userRoutes);         // Endpoints: /auth/register, /auth/login
 app.use('/conversations', conversationRoutes); // Endpoint: /conversations
 
-// Start server
+// Start server if not in test mode
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`Server running on port ${port}`);
+  });
+}
+
+// Export the app for testing or other imports
 module.exports = app;
