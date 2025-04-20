@@ -16,7 +16,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, toggleForm }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:3001/auth/login', { email, password });
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, { email, password });
       localStorage.setItem('token', response.data.token);
       onLogin();
     } catch (err) {
