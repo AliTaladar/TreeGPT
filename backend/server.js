@@ -32,6 +32,4 @@ app.use('/auth', userRoutes);         // Endpoints: /auth/register, /auth/login
 app.use('/conversations', conversationRoutes); // Endpoint: /conversations
 
 // Start server
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+module.exports = app;
