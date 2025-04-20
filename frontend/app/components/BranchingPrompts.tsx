@@ -490,14 +490,28 @@ export default function BranchingPrompts() {
       {/* Header with TreeGPT logo and sidebar toggle */}
       <header className="w-full p-4 flex items-center">
         <button
-          className="mr-3 text-lg hover:bg-gray-100 p-2 rounded-full transition-colors"
+          className="mr-3 text-lg hover:bg-gray-100 p-2 rounded-full transition-colors text-gray-800"
           onClick={() => setSidebarOpen(!sidebarOpen)}
           aria-label="Toggle sidebar"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" strokeWidth="2" />
-            <path d="M9 4V20" stroke="currentColor" strokeWidth="2" />
-            <circle cx="6" cy="10" r="1" fill="currentColor" />
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <rect
+              x="3"
+              y="4"
+              width="18"
+              height="16"
+              rx="3"
+              stroke="currentColor"
+              strokeWidth="2"
+            ></rect>
+            <path d="M9 4V20" stroke="currentColor" strokeWidth="2"></path>
+            <circle cx="6" cy="10" r="1" fill="currentColor"></circle>
           </svg>
         </button>
         <div className="flex items-center">
@@ -635,7 +649,7 @@ export default function BranchingPrompts() {
                     {/* Search input */}
                     <input
                       type="text"
-                      className="flex-grow border-none outline-none text-base py-2 px-0 focus:ring-0 placeholder-gray-400"
+                      className="flex-grow border-none outline-none text-base py-2 px-0 focus:ring-0 placeholder-gray-400 text-gray-800"
                       placeholder="Search or ask a question..."
                       value={userInput}
                       onChange={handleInputChange}
